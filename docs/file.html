@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bitcoin Trend Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #0f1218;
+            color: #e8eaed;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .wrap {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        h1 {
+            margin-bottom: 4px;
+        }
+
+        .small {
+            color: #9aa0a6;
+            font-size: 13px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: #1a1f29;
+            padding: 14px;
+            border-radius: 10px;
+        }
+
+        .card .label {
+            color: #9aa0a6;
+            font-size: 13px;
+        }
+
+        .card .value {
+            font-size: 22px;
+            margin-top: 6px;
+            font-weight: bold;
+        }
+
+        .up {
+            color: #34c759;
+        }
+
+        .down {
+            color: #ff453a;
+        }
+
+        .box {
+            background: #1a1f29;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .warning {
+            background: #2a2418;
+            border: 1px solid #5c4a1a;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>Bitcoin Trend Dashboard</h1>
+        <div class="small" id="updated">Loading...</div>
+
+        <div class="cards">
+            <div class="card">
+                <div class="label">Price (USD)</div>
+                <div class="value" id="price">-</div>
+            </div>
+            <div class="card">
+                <div class="label">24h change</div>
+                <div class="value" id="c24">-</div>
+            </div>
+            <div class="card">
+                <div class="label">7 day change</div>
+                <div class="value" id="c7">-</div>
+            </div>
+            <div class="card">
+                <div class="label">30 day change</div>
+                <div class="value" id="c30">-</div>
+            </div>
+            <div class="card">
+                <div class="label">24h volume (USD)</div>
+                <div class="value" id="vol">-</div>
+            </div>
+            <div class="card">
+                <div class="label">Trend</div>
+                <div class="value" id="trend">-</div>
+            </div>
+        </div>
+
+        <div class="box">
+            <h3>Next hour prediction (random forest)</h3>
+            <div class="value" id="signal" style="font-size:28px; font-weight:bold;">-</div>
+            <div class="small" id="prob"></div>
+        </div>
+
+        <div class="box">
+            <h3>Price, last 30 days</h3>
+            <canvas id="chart"></canvas>
+        </div>
+
+        <div class="box">
+            <h3>How good is the model?</h3>
+            <div id="accuracy" class="small"></div>
+        </div>
+
+        <div class="warning">
+            This is a college project, not financial advice. Hourly Bitcoin direction is very hard to predict,
+            and this model is only slightly better than a coin flip, if at all. Do not trade with it.
+        </div>
+    </div>
+
+    <script>
+        function colorClass(n) { return n >= 0 ? "up" : "down"; }
+        function setChange(id, n) {
+            var el = document.getElementById(id);
+            el.textContent = (n >= 0 ? "+" : "") + n + "%";
+            el.className = "value " + colorClass(n);
+        }
+
+        fetch("data.json")
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                document.getElementById("updated").textContent = "Last data point: " + d.updated + " UTC";
+                document.getElementById("price").textContent = "$" + d.current_price.toLocaleString();
+                setChange("c24", d.change_24h);
+                setChange("c7", d.change_7d);
+                setChange("c30", d.change_30d);
+                document.getElementById("vol").textContent = "$" + Math.round(d.volume_24h_usd / 1e6) + "M";
+                document.getElementById("trend").textContent = d.trend;
+
+                var sig = document.getElementById("signal");
+                sig.textContent = d.signal;
+                if (d.signal === "UP") sig.className = "up";
+                if (d.signal === "DOWN") sig.className = "down";
+                document.getElementById("prob").textContent =
+                    "Probability price goes up next hour: " + d.next_hour_prob_up + "%";
+
+                document.getElementById("accuracy").innerHTML =
+                    "Accuracy on unseen data: " + d.model_accuracy + "%<br>" +
+                    "Balanced accuracy: " + d.model_balanced_accuracy + "% (50% = coin flip)<br>" +
+                    "Always guessing UP would score: " + d.baseline_always_up + "%<br>" +
+                    "Test rows: " + d.test_rows;
+
+                new Chart(document.getElementById("chart"), {
+                    type: "line",
+                    data: {
+                        labels: d.chart_times.map(function (t) { return t.slice(5, 16); }),
+                        datasets: [{
+                            label: "BTC price (USD)",
+                            data: d.chart_prices,
+                            borderColor: "#f7931a",
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            x: { ticks: { maxTicksLimit: 8, color: "#9aa0a6" } },
+                            y: { ticks: { color: "#9aa0a6" } }
+                        },
+                        plugins: { legend: { labels: { color: "#e8eaed" } } }
+                    }
+                });
+            })
+            .catch(function () {
+                document.getElementById("updated").textContent = "Could not load data.json";
+            });
+    </script>
+</body>
+
+</html>

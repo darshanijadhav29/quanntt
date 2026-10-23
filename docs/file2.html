@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BTC Watch</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;800&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --paper: #f3eee3;
+            --ink: #1d1b16;
+            --muted: #7a7466;
+            --line: #d9d1bf;
+            --green: #1f8f4e;
+            --red: #cf3b3b;
+            --orange: #e08a1e;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--paper);
+            color: var(--ink);
+            font-family: "DM Mono", monospace;
+            padding: 28px 18px 60px;
+        }
+
+        .wrap {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        /* top bar */
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            border-bottom: 3px solid var(--ink);
+            padding-bottom: 8px;
+        }
+
+        .logo {
+            font-family: "Fraunces", serif;
+            font-weight: 800;
+            font-size: 26px;
+        }
+
+        .stamp {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* big price */
+        .hero {
+            padding: 34px 0 20px;
+        }
+
+        .hero .tag {
+            font-size: 12px;
+            letter-spacing: 2px;
+            color: var(--muted);
+        }
+
+        .hero .price {
+            font-family: "Fraunces", serif;
+            font-weight: 800;
+            font-size: clamp(48px, 12vw, 92px);
+            line-height: 1;
+            margin: 6px 0;
+        }
+
+        .hero .move {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .up {
+            color: var(--green);
+        }
+
+        .down {
+            color: var(--red);
+        }
+
+        /* stat rows */
+        .stats {
+            border-top: 1px solid var(--line);
+            margin: 10px 0 30px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--line);
+            font-size: 15px;
+        }
+
+        .row .name {
+            color: var(--muted);
+        }
+
+        h2 {
+            font-family: "Fraunces", serif;
+            font-size: 22px;
+            margin: 34px 0 10px;
+        }
+
+        /* chart */
+        .buttons {
+            margin-bottom: 10px;
+        }
+
+        .buttons button {
+            font-family: "DM Mono", monospace;
+            background: none;
+            border: 2px solid var(--ink);
+            padding: 6px 14px;
+            margin-right: 6px;
+            cursor: pointer;
+            color: var(--ink);
+        }
+
+        .buttons button.active {
+            background: var(--ink);
+            color: var(--paper);
+        }
+
+        .chartbox {
+            border: 2px solid var(--ink);
+            padding: 12px;
+            background: #f9f6ee;
+        }
+
+        /* prediction */
+        .predict {
+            border: 2px solid var(--ink);
+            padding: 18px;
+            background: #f9f6ee;
+        }
+
+        .signal {
+            font-family: "Fraunces", serif;
+            font-weight: 800;
+            font-size: 40px;
+        }
+
+        .bar {
+            position: relative;
+            height: 16px;
+            margin: 16px 0 6px;
+            background: linear-gradient(to right, var(--red), #e8dfc8 50%, var(--green));
+            border: 2px solid var(--ink);
+        }
+
+        .bar .mark {
+            position: absolute;
+            top: -8px;
+            width: 4px;
+            height: 32px;
+            background: var(--ink);
+        }
+
+        .barlabels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .note {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .warning {
+            margin-top: 34px;
+            border-left: 5px solid var(--orange);
+            padding: 10px 14px;
+            font-size: 13px;
+            line-height: 1.6;
+            background: #f1e6cf;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <div class="top">
+            <div class="logo">BTC Watch</div>
+            <div class="stamp" id="updated">loading...</div>
+        </div>
+
+        <div class="hero">
+            <div class="tag">BITCOIN / USD</div>
+            <div class="price" id="price">--</div>
+            <div class="move" id="move">--</div>
+        </div>
+
+        <div class="stats">
+            <div class="row"><span class="name">7 day change</span><span id="c7">--</span></div>
+            <div class="row"><span class="name">30 day change</span><span id="c30">--</span></div>
+            <div class="row"><span class="name">24h trading volume</span><span id="vol">--</span></div>
+            <div class="row"><span class="name">Trend</span><span id="trend">--</span></div>
+        </div>
+
+        <h2>Price chart</h2>
+        <div class="buttons">
+            <button data-hours="24">24H</button>
+            <button data-hours="168">7D</button>
+            <button data-hours="720" class="active">30D</button>
+        </div>
+        <div class="chartbox"><canvas id="chart"></canvas></div>
+        <p class="note">Green part of the line = price went up. Red part = price went down.</p>
+
+        <h2>Next hour guess</h2>
+        <div class="predict">
+            <div class="signal" id="signal">--</div>
+            <div class="bar">
+                <div class="mark" id="mark" style="left: 50%"></div>
+            </div>
+            <div class="barlabels"><span>0% (down)</span><span>50%</span><span>100% (up)</span></div>
+            <p class="note" id="prob"></p>
+        </div>
+
+        <h2>How good is the model?</h2>
+        <div class="stats">
+            <div class="row"><span class="name">Accuracy on unseen data</span><span id="acc">--</span></div>
+            <div class="row"><span class="name">Balanced accuracy</span><span id="bal">--</span></div>
+            <div class="row"><span class="name">Always guessing UP</span><span id="base">--</span></div>
+            <div class="row"><span class="name">Test rows</span><span id="rows">--</span></div>
+        </div>
+        <p class="note">50% means a coin flip. If the model is only a little above the "always UP" line, it is not
+            really finding a pattern.</p>
+
+        <div class="warning">
+            College project, not financial advice.
+        </div>
+
+    </div>
+
+    <script>
+        var GREEN = "#1f8f4e";
+        var RED = "#cf3b3b";
+
+        var allTimes = [];
+        var allPrices = [];
+        var chart = null;
+
+        // show a number with + or - and the right color
+        function showChange(id, number) {
+            var el = document.getElementById(id);
+            var sign = number >= 0 ? "+" : "";
+            el.textContent = sign + number + "%";
+            el.className = number >= 0 ? "up" : "down";
+        }
+
+        // draw (or redraw) the chart for the last X hours
+        function drawChart(hours) {
+            var times = allTimes.slice(-hours);
+            var prices = allPrices.slice(-hours);
+
+            // too many points look messy, so take every 4th one on the long chart
+            var step = prices.length > 200 ? 4 : 1;
+            var smallTimes = [];
+            var smallPrices = [];
+            for (var i = 0; i < prices.length; i += step) {
+                smallTimes.push(times[i].slice(5, 16));
+                smallPrices.push(prices[i]);
+            }
+
+            if (chart) { chart.destroy(); }
+
+            chart = new Chart(document.getElementById("chart"), {
+                type: "line",
+                data: {
+                    labels: smallTimes,
+                    datasets: [{
+                        label: "BTC price (USD)",
+                        data: smallPrices,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.15,
+                        borderColor: GREEN,
+                        // this is the part that colors each piece of the line
+                        segment: {
+                            borderColor: function (ctx) {
+                                if (ctx.p1.parsed.y >= ctx.p0.parsed.y) { return GREEN; }
+                                return RED;
+                            }
+                        }
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 6, color: "#7a7466" }, grid: { display: false } },
+                        y: { ticks: { color: "#7a7466" }, grid: { color: "#e3dccb" } }
+                    }
+                }
+            });
+        }
+
+        fetch("data.json")
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                allTimes = d.chart_times;
+                allPrices = d.chart_prices;
+
+                document.getElementById("updated").textContent = "data until " + d.updated.slice(0, 16) + " UTC";
+                document.getElementById("price").textContent = "$" + d.current_price.toLocaleString();
+
+                var m = document.getElementById("move");
+                var sign = d.change_24h >= 0 ? "+" : "";
+                m.textContent = sign + d.change_24h + "% in 24h";
+                m.className = "move " + (d.change_24h >= 0 ? "up" : "down");
+
+                showChange("c7", d.change_7d);
+                showChange("c30", d.change_30d);
+                document.getElementById("vol").textContent = "$" + Math.round(d.volume_24h_usd / 1000000) + "M";
+                document.getElementById("trend").textContent = d.trend;
+
+                var sig = document.getElementById("signal");
+                sig.textContent = d.signal;
+                if (d.signal === "UP") { sig.className = "signal up"; }
+                if (d.signal === "DOWN") { sig.className = "signal down"; }
+
+                document.getElementById("mark").style.left = d.next_hour_prob_up + "%";
+                document.getElementById("prob").textContent =
+                    "The model gives a " + d.next_hour_prob_up + "% chance that the price goes up in the next hour.";
+
+                document.getElementById("acc").textContent = d.model_accuracy + "%";
+                document.getElementById("bal").textContent = d.model_balanced_accuracy + "%";
+                document.getElementById("base").textContent = d.baseline_always_up + "%";
+                document.getElementById("rows").textContent = d.test_rows;
+
+                drawChart(720);
+            })
+            .catch(function () {
+                document.getElementById("updated").textContent = "could not load data.json";
+            });
+
+        // time buttons
+        var buttons = document.querySelectorAll(".buttons button");
+        buttons.forEach(function (b) {
+            b.addEventListener("click", function () {
+                buttons.forEach(function (x) { x.classList.remove("active"); });
+                b.classList.add("active");
+                drawChart(Number(b.dataset.hours));
+            });
+        });
+    </script>
+</body>
+
+</html>
